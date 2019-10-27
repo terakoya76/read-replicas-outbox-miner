@@ -41,15 +41,14 @@ func buildConnectInfo() string {
 	)
 }
 
-// Mine fetches batch-sized number of records from the outbox table
-func (c *MySQLClient) Mine(startPos tracker.Position) ([]converters.InternalRow, error) {
-	config := config.Miner
+// Fetch fetches batch-sized number of records from the outbox table
+func (c *MySQLClient) Fetch(startPos tracker.Position, target *config.MinerTarget) ([]converters.InternalRow, error) {
 	startID := int64(startPos)
-	endID := startID + config.BatchSize
+	endID := startID + target.BatchSize
 	rows, err := c.Queryx(fmt.Sprintf(
 		"SELECT * FROM %s WHERE %s BETWEEN %d AND %d;",
-		config.Table,
-		config.TrackKey,
+		target.Table,
+		target.TrackKey,
 		startID,
 		endID,
 	))

@@ -129,10 +129,20 @@ func Map2JSON(row InternalRow) ([]byte, error) {
 // Cast2Position converts numeric data type to Position
 func Cast2Position(val interface{}) tracker.Position {
 	switch v := val.(type) {
-	case *int32:
-		return tracker.Position(int64(*v))
-	case *int64:
-		return tracker.Position(*v)
+	case int:
+		return tracker.Position(int64(v))
+	case int8:
+		return tracker.Position(int64(v))
+	case int16:
+		return tracker.Position(int64(v))
+	case int32:
+		return tracker.Position(int64(v))
+	case int64:
+		return tracker.Position(v)
+	case float32:
+		return tracker.Position(int64(v))
+	case float64:
+		return tracker.Position(int64(v))
 	default:
 		panic(errors.New("non-supported track key DataType"))
 	}

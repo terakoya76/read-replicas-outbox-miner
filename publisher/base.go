@@ -15,10 +15,10 @@ type Publisher interface {
 }
 
 // BuildPublisher builds Publisher for abstraction
-func BuildPublisher() (Publisher, error) {
+func BuildPublisher(target *config.MinerTarget) (Publisher, error) {
 	switch config.Publisher.Strategy {
 	case "kinesis-data-streams":
-		return BuildKinesisDataStreamsPublisher()
+		return BuildKinesisDataStreamsPublisher(target)
 	default:
 		return nil, errors.New("not supported Publisher Strategy")
 	}

@@ -1,0 +1,10 @@
+database: outbox_db
+targets:
+- table: outbox_a
+  trackKey: id
+  publisherPartitionKey: event_type
+  batchSize: 500
+- table: outbox_b
+  trackKey: b_id
+  publisherPartitionKey: event_type
+  batchSize: 500

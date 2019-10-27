@@ -31,14 +31,15 @@ type KinesisDataStreamsPublisher struct {
 	*kinesis.Kinesis
 	streamName   *string
 	partitionKey *string
+	target       *config.MinerTarget
 	buffer       []*kinesis.PutRecordsRequestEntry
 	counter      int64
 	position     tracker.Position
 }
 
 // BuildKinesisDataStreamsPublisher builds KinesisDataStreams specific Publisher
-func BuildKinesisDataStreamsPublisher() (*KinesisDataStreamsPublisher, error) {
-	err := validateClient()
+func BuildKinesisDataStreamsPublisher(target *config.MinerTarget) (*KinesisDataStreamsPublisher, error) {
+	err := validateClient(target)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +54,7 @@ func BuildKinesisDataStreamsPublisher() (*KinesisDataStreamsPublisher, error) {
 	)
 
 	streamName := aws.String(config.StreamName)
-	partitionKey := aws.String(config.PartitionKey)
+	partitionKey := aws.String(target.PublisherPartitionKey)
 	_, err = kc.DescribeStream(&kinesis.DescribeStreamInput{StreamName: streamName})
 	if err != nil {
 		panic(err)
@@ -63,6 +64,7 @@ func BuildKinesisDataStreamsPublisher() (*KinesisDataStreamsPublisher, error) {
 		Kinesis:      kc,
 		streamName:   streamName,
 		partitionKey: partitionKey,
+		target:       target,
 		buffer:       make([]*kinesis.PutRecordsRequestEntry, 0),
 		counter:      0,
 		position:     0,
@@ -70,10 +72,11 @@ func BuildKinesisDataStreamsPublisher() (*KinesisDataStreamsPublisher, error) {
 	return &kp, nil
 }
 
-func validateClient() error {
-	if config.Miner.BatchSize > LIMIT_RECORDS_PER_REQUEST {
+func validateClient(target *config.MinerTarget) error {
+	if target.BatchSize > LIMIT_RECORDS_PER_REQUEST {
 		return errors.New("KinesisDataStreams#PutRecords accepts 500 records per request")
 	}
+
 	return nil
 }
 
@@ -92,7 +95,6 @@ func (kp *KinesisDataStreamsPublisher) Publish(event converters.InternalRow) (bo
 		return published, err
 	}
 
-	kp.track(event)
 	if kp.ready() {
 		if err := kp.publish(); err != nil {
 			return published, err
@@ -148,18 +150,12 @@ func (kp *KinesisDataStreamsPublisher) acceptable(entry *kinesis.PutRecordsReque
 	return nil
 }
 
-// Save last-stuffed event's position to make usable from tracker
-func (kp *KinesisDataStreamsPublisher) track(event converters.InternalRow) {
-	// TODO: check if event does not have trackKey attr
-	kp.position = converters.Cast2Position(event[config.Miner.TrackKey])
-}
-
 func (kp *KinesisDataStreamsPublisher) ready() bool {
 	bytes, err := json.Marshal(kp.buffer)
 	if err != nil {
 		panic(err)
 	}
-	return kp.counter == config.Miner.BatchSize || binary.Size(bytes) >= PUBLISH_READINESS_THRESHOLD
+	return kp.counter == kp.target.BatchSize || binary.Size(bytes) >= PUBLISH_READINESS_THRESHOLD
 }
 
 func (kp *KinesisDataStreamsPublisher) publish() error {
@@ -170,9 +166,19 @@ func (kp *KinesisDataStreamsPublisher) publish() error {
 		return err
 	}
 
+	kp.track()
 	kp.buffer = make([]*kinesis.PutRecordsRequestEntry, 0)
 	kp.counter = 0
 	return nil
+}
+
+// hold last event's position from buffer in order to make usable from tracker
+func (kp *KinesisDataStreamsPublisher) track() {
+	// TODO: check if event does not have trackKey attr
+	event := converters.InternalRow{}
+	lastEntry := kp.buffer[len(kp.buffer)-1]
+	json.Unmarshal(lastEntry.Data, &event)
+	kp.position = converters.Cast2Position(event[kp.target.TrackKey])
 }
 
 // GetPosition returns the position of last event in buffer

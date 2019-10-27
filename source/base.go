@@ -10,7 +10,7 @@ import (
 
 // SourceClient provide queries for outbox table
 type SourceClient interface {
-	Mine(startPos tracker.Position) ([]converters.InternalRow, error)
+	Fetch(startPos tracker.Position, target *config.MinerTarget) ([]converters.InternalRow, error)
 }
 
 // BuildClient builds SourceClient for abstraction

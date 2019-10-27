@@ -87,11 +87,13 @@ func (mts *MySQLTrackerStorage) WithTx(f func() error) (err error) {
 	}
 }
 
-func (mts *MySQLTrackerStorage) Prepare(dbName string, tableName string, trackKey string) error {
-	if err := mts.prepareProgress(dbName, tableName, trackKey); err != nil {
-		return err
+func (mts *MySQLTrackerStorage) Prepare() error {
+	config := config.Miner
+	for _, target := range config.Targets {
+		if err := mts.prepareProgress(config.Database, target.Table, target.TrackKey); err != nil {
+			return err
+		}
 	}
-
 	return nil
 }
 
@@ -139,7 +141,8 @@ func (mts *MySQLTrackerStorage) GetProgress(dbName string, tableName string) (*P
 
 // UpdateProgress updates progress's position
 func (mts *MySQLTrackerStorage) UpdateProgress(prgs *Progress) (*Progress, error) {
-	if _, err := mts.DB().NamedExec("UPDATE progresses SET position = :position WHERE source_id = :source_id", prgs); err != nil {
+	if _, err := mts.DB().NamedExec(
+		"UPDATE progresses SET position = :position WHERE database_name = :database_name AND table_name = :table_name", prgs); err != nil {
 		return nil, err
 	}
 

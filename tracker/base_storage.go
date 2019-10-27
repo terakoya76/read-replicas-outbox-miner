@@ -13,7 +13,7 @@ import (
 // TrackerStorage provide access to persisted Progress
 type TrackerStorage interface {
 	WithTx(f func() error) error
-	Prepare(dbName string, tableName string, trackKey string) error
+	Prepare() error
 	GetProgress(dbName string, tableName string) (*Progress, error)
 	UpdateProgress(progress *Progress) (*Progress, error)
 }
@@ -32,8 +32,7 @@ func BuildTrackerStorage() (TrackerStorage, error) {
 		return nil, errors.New("not supported data source")
 	}
 
-	config := config.Miner
-	if err := ts.Prepare(config.Database, config.Table, config.TrackKey); err != nil {
+	if err := ts.Prepare(); err != nil {
 		return nil, err
 	}
 

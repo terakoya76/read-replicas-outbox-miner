@@ -34,7 +34,7 @@ func (tc *TrackerClient) UpdatePosition(dbName string, tableName string, positio
 		return err
 	}
 
-	prgs.Position += position
+	prgs.Position = position
 	prgs, err = tc.UpdateProgress(prgs)
 	if err != nil {
 		return err

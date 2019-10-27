@@ -2,9 +2,12 @@ package config
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/kelseyhightower/envconfig"
+	"github.com/spf13/viper"
 )
 
 var once = new(sync.Once)
@@ -18,6 +21,10 @@ func init() {
 		if err := initOpt(); err != nil {
 			panic(err)
 		}
+
+		if err := initMineTargets(); err != nil {
+			panic(err)
+		}
 	})
 }
 
@@ -29,15 +36,6 @@ type trackerSpec struct {
 	Strategy string `default:"mysql"`
 }
 
-// TrackKey must be AutoIncremental Key
-// Default BatchSize fit to Kinesis#PutRecords API limitation
-type minerSpec struct {
-	Database  string `required:"true"`
-	Table     string `required:"true"`
-	TrackKey  string `required:"true"`
-	BatchSize int64  `default:"500"`
-}
-
 type publisherSpec struct {
 	Strategy string `default:"kinesis-data-stream"`
 }
@@ -47,9 +45,6 @@ var Source *sourceSpec
 
 // Tracker represents information about MySQL configuration for Tracker persisting source position
 var Tracker *trackerSpec
-
-// Miner represents information about Miner and its target
-var Miner *minerSpec
 
 // Publisher represents information where the mined events to be published
 var Publisher *publisherSpec
@@ -67,12 +62,6 @@ func initMust() error {
 		return err
 	}
 	Tracker = &ts
-
-	var ms minerSpec
-	if err := envconfig.Process("miner", &ms); err != nil {
-		return err
-	}
-	Miner = &ms
 
 	var ps publisherSpec
 	if err := envconfig.Process("publisher", &ps); err != nil {
@@ -99,10 +88,9 @@ type trackerMysqlSpec struct {
 }
 
 type kinesisPublisherSpec struct {
-	Region       string `required:"true"`
-	Endpoint     string `default:"127.0.0.1:4567"`
-	StreamName   string `required:"true"`
-	PartitionKey string `required:"true"`
+	Region     string `required:"true"`
+	Endpoint   string `default:"127.0.0.1:4567"`
+	StreamName string `required:"true"`
 }
 
 // SourceMySQL represents information about DataSource MySQL Configuration
@@ -147,6 +135,63 @@ func initOpt() error {
 	default:
 		return errors.New("non-supported publisher")
 	}
+
+	return nil
+}
+
+// MinerTarget represents where to be mined by Miner.
+// TrackKey must be AutoIncremental uniq Key.
+type MinerTarget struct {
+	Table                 string
+	TrackKey              string
+	PublisherPartitionKey string
+	BatchSize             int64
+}
+
+type minerSpec struct {
+	Database string
+	Targets  []*MinerTarget
+}
+
+var Miner *minerSpec
+
+// initMineTargets reads in config file and ENV variables if set.
+func initMineTargets() error {
+	configPath := os.Getenv("MINER_TARGETS_CONFIG_PATH")
+	if configPath != "" {
+		// Use config file from the env.
+		viper.SetConfigFile(configPath)
+	} else {
+		// find current working directory.
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+
+		viper.AddConfigPath(dir)
+		viper.SetConfigName("miner-targets")
+		viper.SetConfigType("yaml")
+	}
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err != nil {
+		return err
+	}
+	fmt.Println("Using config file:", viper.ConfigFileUsed())
+
+	if err := loadConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func loadConfig() error {
+	var ms minerSpec
+	if err := viper.Unmarshal(&ms); err != nil {
+		return err
+	}
+	Miner = &ms
 
 	return nil
 }
