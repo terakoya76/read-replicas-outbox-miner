@@ -1,0 +1,23 @@
+version: '3.7'
+services:
+  mysql:
+    image: mysql:5.7 # not 8.x for Sequel Pro
+    volumes:
+      - "mysql-data:/var/lib/mysql/:delegated"
+      - "./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql"
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+  kinesis:
+    build: ./kinesis-data-streams/
+    image: kinesis-data-streams:latest
+    volumes:
+      - "kinesis-data:/kinesis/data:delegated"
+    ports:
+      - "4567:4567"
+volumes:
+  mysql-data:
+    driver: local
+  kinesis-data:
+    driver: local

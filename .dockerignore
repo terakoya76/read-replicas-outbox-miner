@@ -1,0 +1,12 @@
+*
+
+!config
+!converters
+!executor
+!publisher
+!schema
+!source
+!tracker
+!go.mod
+!go.sum
+!main.go

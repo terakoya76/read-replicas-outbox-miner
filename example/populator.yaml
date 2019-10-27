@@ -1,0 +1,24 @@
+database:
+  driver: mysql
+  host: 127.0.0.1
+  user: root
+  password:
+  name: outbox_db
+  port: 3306
+tables:
+- name: outbox
+  columns:
+    - name: id
+      type: bigint
+      primary: true
+      autoIncrement: true
+    - name: event_type
+      type: varchar
+      values:
+        - CREATED
+        - UPDATED
+        - DELETED
+    - name: data
+      type: varchar
+  charset: utf8mb4
+  record: 100000
